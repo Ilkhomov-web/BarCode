@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Professional Gilam Barcode Tizimi</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        background: #f0f2f5;
+        padding: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      select,
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      .btn-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      button {
+        flex: 1;
+        padding: 15px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        color: white;
+        transition: 0.3s;
+      }
+      .btn-gen {
+        background: #28a745;
+      }
+      .btn-print {
+        background: #007bff;
+      }
+      .barcode-item {
+        display: inline-block;
+        width: 280px;
+        padding: 15px;
+        border: 1px solid #eee;
+        margin: 10px;
+        text-align: center;
+        background: white;
+      }
+      .info-text {
+        font-size: 11px;
+        font-weight: bold;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+      }
+      @media print {
+        .container {
+          display: none;
+        }
+        .barcode-item {
+          border: none;
+          margin: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2 style="text-align: center">Gilamlar uchun Maxsus Generator</h2>
+      <div class="grid">
+        <div>
+          <label>Gilam Nomi:</label>
+          <select id="nameCode">
+            <option value="01">Mashhad</option>
+            <option value="02">Aladin</option>
+            <option value="03">Zeekr</option>
+          </select>
+        </div>
+        <div>
+          <label>Rangi (Input):</label>
+          <input
+            type="number"
+            id="colorInput"
+            placeholder="Masalan: 37"
+            value="37"
+          />
+        </div>
+        <div>
+          <label>O'lchami (Masalan: 400x500):</label>
+          <input
+            type="text"
+            id="sizeInput"
+            placeholder="400x500"
+            value="400x500"
+          />
+        </div>
+        <div>
+          <label>Oxirgi ID (Takrorlanmaslik):</label>
+          <input type="number" id="globalID" value="1" />
+        </div>
+        <div>
+          <label>Nechta dona:</label>
+          <input type="number" id="qty" value="10" />
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-gen" onclick="generateBatch()">
+          Generatsiya qilish
+        </button>
+        <button class="btn-print" onclick="window.print()">
+          Printerga yuborish
+        </button>
+      </div>
+    </div>
+
+    <div id="displayArea" style="text-align: center; margin-top: 20px"></div>
+
+    <script>
+      function calculateEAN(base) {
+        let sum = 0;
+        for (let i = 0; i < 12; i++) {
+          sum += parseInt(base[i]) * (i % 2 === 0 ? 1 : 3);
+        }
+        let check = (10 - (sum % 10)) % 10;
+        return check;
+      }
+
+      function generateBatch() {
+        const nameCode = document.getElementById("nameCode").value;
+        const colorInput = document
+          .getElementById("colorInput")
+          .value.toString()
+          .padStart(2, "0")
+          .slice(-2);
+        const sizeRaw = document.getElementById("sizeInput").value;
+
+        // Razmerdan faqat raqamlarni ajratib olamiz (400x500 -> 400500)
+        // EAN ichida joy yetishi uchun 5 ta raqam ajratamiz
+        const sizeDigits = sizeRaw
+          .replace(/[^0-9]/g, "")
+          .padStart(5, "0")
+          .slice(0, 5);
+
+        const startID = parseInt(document.getElementById("globalID").value);
+        const qty = parseInt(document.getElementById("qty").value);
+        const area = document.getElementById("displayArea");
+        const nameText =
+          document.getElementById("nameCode").options[
+            document.getElementById("nameCode").selectedIndex
+          ].text;
+
+        area.innerHTML = "";
+
+        for (let i = 0; i < qty; i++) {
+          // Unikal qism (001 dan 999 gacha) - bu 10 dona bo'lsa ham ularni ajratadi
+          let uniquePart = (startID + i).toString().padStart(3, "0").slice(-3);
+
+          // Struktura: 20 + Nom(2) + Rang(2) + Razmer(5) + Unikal(3) = 12 ta raqam
+          // Diqqat: EAN-13 jami 12 raqam + 1 check digit.
+          // Yuqoridagilar jami: 2+2+2+5+3 = 14 raqam bo'lib ketadi.
+          // Shuning uchun mantiqni qisqartiramiz:
+          // 20 (Prefiks) + Nom(1) + Rang(2) + Razmer(4) + Unikal(3) = 12 raqam
+
+          let nomShort = nameCode.slice(-1); // 1 raqam
+          let sizeShort = sizeDigits.slice(0, 4); // 4 raqam
+
+          let baseCode = "20" + nomShort + colorInput + sizeShort + uniquePart;
+          let fullBarcode = baseCode + calculateEAN(baseCode);
+
+          let div = document.createElement("div");
+          div.className = "barcode-item";
+          div.innerHTML = `
+                <div class="info-text">${nameText} | R: ${colorInput} | S: ${sizeRaw}</div>
+                <svg id="b${i}"></svg>
+            `;
+          area.appendChild(div);
+
+          JsBarcode(`#b${i}`, fullBarcode, {
+            format: "EAN13",
+            width: 2,
+            height: 45,
+            fontSize: 13,
+            displayValue: true,
+          });
+        }
+
+        document.getElementById("globalID").value = startID + qty;
+      }
+    </script>
+  </body>
+</html>
