@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gilam Baza Pro | 2026</title>
+    <title>Gilam Baza Pro | 2026 v2</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link
@@ -177,26 +177,6 @@
         width: 100%;
         height: auto;
       }
-
-      #printArea {
-        display: none;
-      }
-      @media print {
-        body * {
-          visibility: hidden;
-        }
-        #printArea,
-        #printArea * {
-          visibility: visible;
-        }
-        #printArea {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          display: block !important;
-        }
-      }
     </style>
   </head>
   <body>
@@ -278,6 +258,7 @@
       </div>
     </div>
 
+    <!-- VIEW MODAL -->
     <div id="viewModal" class="modal" onclick="closeModal()">
       <div class="modal-content" onclick="event.stopPropagation()">
         <h3 id="modalTitle" style="margin: 0"></h3>
@@ -288,33 +269,32 @@
         <div class="barcode-box">
           <svg id="previewSvg"></svg>
         </div>
+
+        <!-- Print quantity -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
+          <label style="font-size: 13px; margin: 0;">Nechta:</label>
+          <button class="btn" style="background:#f1f5f9; padding:4px 12px; font-size:16px;" onclick="changePrintQty(-1)">−</button>
+          <span id="printQty" style="font-size: 18px; font-weight: 800; min-width: 30px; text-align: center;">1</span>
+          <button class="btn" style="background:#f1f5f9; padding:4px 12px; font-size:16px;" onclick="changePrintQty(1)">+</button>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
-          <button
-            class="btn"
-            style="background: #f1f5f9"
-            onclick="closeModal()"
-          >
+          <button class="btn" style="background: #f1f5f9" onclick="closeModal()">
             Yopish
           </button>
-          <button
-            class="btn"
-            style="background: var(--success); color: white"
-            onclick="printFromModal()"
-          >
+          <button class="btn" style="background: var(--success); color: white" onclick="printFromModal()">
             <i data-lucide="printer"></i> Chiqarish
           </button>
         </div>
       </div>
     </div>
 
-    <div id="printArea"></div>
-
     <script>
       let db;
       let currentItem = null;
+      let printQuantity = 1;
 
-      // IndexedDB initialization
-      const request = indexedDB.open("CarpetFinalDB", 2); // Versiyani oshirdik
+      const request = indexedDB.open("CarpetFinalDB", 2);
       request.onupgradeneeded = (e) => {
         db = e.target.result;
         if (!db.objectStoreNames.contains("carpets")) {
@@ -329,7 +309,6 @@
         renderHistory();
       };
 
-      // O'lchami uchun hash generatsiya (Senior Algorithm)
       function generateSizeId(sizeStr) {
         let hash = 0;
         const cleanSize = sizeStr.replace(/\s+/g, "").toLowerCase();
@@ -337,9 +316,7 @@
           hash = (hash << 5) - hash + cleanSize.charCodeAt(i);
           hash |= 0;
         }
-        return Math.abs(hash % 100)
-          .toString()
-          .padStart(2, "0");
+        return Math.abs(hash % 100).toString().padStart(2, "0");
       }
 
       function calculateEAN(base) {
@@ -357,31 +334,22 @@
         const sizeRaw = document.getElementById("carpetSize").value.trim();
 
         if (!designRaw || !colorRaw || !sizeRaw) {
-          alert("⚠️ Iltimos, barcha maydonlarni to'ldiring!");
+          alert("\u26a0\ufe0f Iltimos, barcha maydonlarni to'ldiring!");
           return;
         }
 
-        // --- NORMALIZATSIYA (MUHIM!) ---
-        // Foydalanuvchi "37" yozsa ham, "0037" yozsa ham bazada "0037" bo'lib saqlanadi.
         const cleanDesign = designRaw.replace(/\D/g, "").padStart(4, "0");
         const cleanColor = colorRaw.replace(/\D/g, "").padStart(4, "0");
         const cleanSize = sizeRaw.replace(/\s+/g, "").toLowerCase();
 
-        // Barcode generatsiyasi
         const typePart = nameSelect.value.padStart(2, "0");
         const designPartForBarcode = cleanDesign.slice(-3);
         const colorPartForBarcode = cleanColor.slice(-3);
         const sizePartForBarcode = generateSizeId(cleanSize);
 
-        const baseCode =
-          "20" +
-          typePart +
-          designPartForBarcode +
-          colorPartForBarcode +
-          sizePartForBarcode;
+        const baseCode = "20" + typePart + designPartForBarcode + colorPartForBarcode + sizePartForBarcode;
         const fullCode = baseCode + calculateEAN(baseCode);
 
-        // Dublikatni tekshirish
         const tx = db.transaction("carpets", "readonly");
         const store = tx.objectStore("carpets");
 
@@ -396,22 +364,17 @@
           );
 
           if (isDuplicate) {
-            alert(
-              `❌ BU TOVAR ALLAQACHON MAVJUD!\n\n${
-                nameSelect.options[nameSelect.selectedIndex].text
-              } | Nusxa: ${cleanDesign} | Rang: ${cleanColor} | O'lcham: ${sizeRaw}`
-            );
+            alert("\u274c BU TOVAR ALLAQACHON MAVJUD!\n\n" + nameSelect.options[nameSelect.selectedIndex].text + " | Nusxa: " + cleanDesign + " | Rang: " + cleanColor + " | O'lcham: " + sizeRaw);
             document.getElementById("searchInput").value = cleanDesign;
             renderHistory();
             return;
           }
 
-          // Yangi tovar qo'shish
           const newItem = {
             name: nameSelect.options[nameSelect.selectedIndex].text,
-            design: cleanDesign, // Normalizatsiya qilingan
-            color: cleanColor, // Normalizatsiya qilingan
-            size: sizeRaw, // Ko'rinish uchun asl holi
+            design: cleanDesign,
+            color: cleanColor,
+            size: sizeRaw,
             barcode: fullCode,
             time: Date.now(),
           };
@@ -428,41 +391,29 @@
       }
 
       function renderHistory() {
-        const search = document
-          .getElementById("searchInput")
-          .value.toLowerCase();
+        const search = document.getElementById("searchInput").value.toLowerCase();
         const tbody = document.getElementById("historyBody");
         tbody.innerHTML = "";
 
-        db.transaction("carpets").objectStore("carpets").getAll().onsuccess = (
-          e
-        ) => {
+        db.transaction("carpets").objectStore("carpets").getAll().onsuccess = (e) => {
           const items = e.target.result.sort((a, b) => b.time - a.time);
           items.forEach((item) => {
-            if (
-              `${item.name} ${item.design} ${item.color} ${item.barcode}`
-                .toLowerCase()
-                .includes(search)
-            ) {
+            if ((item.name + " " + item.design + " " + item.color + " " + item.barcode).toLowerCase().includes(search)) {
               const tr = document.createElement("tr");
-              tr.innerHTML = `
-                <td><b>${item.name}</b></td>
-                <td><span class="badge">${item.design}</span></td>
-                <td>${item.color}</td>
-                <td>${item.size}</td>
-                <td><code>${item.barcode}</code></td>
-                <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
-                  <button class="btn" style="background:#f1f5f9; padding:6px 10px" onclick='viewBarcode(${JSON.stringify(
-                    item
-                  )})'>
-                    <i data-lucide="eye" style="width:16px"></i>
-                  </button>
-                  <button class="btn" style="background:#fff1f2; color:var(--danger); padding:6px 10px" onclick="deleteItem(${
-                    item.id
-                  })">
-                    <i data-lucide="trash-2" style="width:16px"></i>
-                  </button>
-                </td>`;
+              tr.innerHTML =
+                '<td><b>' + item.name + '</b></td>' +
+                '<td><span class="badge">' + item.design + '</span></td>' +
+                '<td>' + item.color + '</td>' +
+                '<td>' + item.size + '</td>' +
+                '<td><code>' + item.barcode + '</code></td>' +
+                '<td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">' +
+                  '<button class="btn" style="background:#f1f5f9; padding:6px 10px" onclick=\'viewBarcode(' + JSON.stringify(item) + ')\'>' +
+                    '<i data-lucide="eye" style="width:16px"></i>' +
+                  '</button>' +
+                  '<button class="btn" style="background:#fff1f2; color:var(--danger); padding:6px 10px" onclick="deleteItem(' + item.id + ')">' +
+                    '<i data-lucide="trash-2" style="width:16px"></i>' +
+                  '</button>' +
+                '</td>';
               tbody.appendChild(tr);
             }
           });
@@ -478,20 +429,24 @@
         }
       }
 
+      function changePrintQty(delta) {
+        printQuantity = Math.max(1, Math.min(50, printQuantity + delta));
+        document.getElementById("printQty").textContent = printQuantity;
+      }
+
       function viewBarcode(item) {
         currentItem = item;
+        printQuantity = 1;
+        document.getElementById("printQty").textContent = 1;
+
         const modal = document.getElementById("viewModal");
         modal.style.display = "flex";
-        setTimeout(() => modal.classList.add("show"), 10);
+        setTimeout(function() { modal.classList.add("show"); }, 10);
 
-        document.getElementById(
-          "modalTitle"
-        ).innerText = `${item.name} | Nusxa: ${item.design}`;
-        document.getElementById(
-          "modalSub"
-        ).innerText = `Rang: ${item.color} • O'lcham: ${item.size}`;
+        document.getElementById("modalTitle").innerText = item.name + " | Nusxa: " + item.design;
+        document.getElementById("modalSub").innerText = "Rang: " + item.color + " \u2022 O'lcham: " + item.size;
 
-        setTimeout(() => {
+        setTimeout(function() {
           JsBarcode("#previewSvg", item.barcode, {
             format: "EAN13",
             width: 2.5,
@@ -503,27 +458,88 @@
       }
 
       function closeModal() {
-        const modal = document.getElementById("viewModal");
+        var modal = document.getElementById("viewModal");
         modal.classList.remove("show");
-        setTimeout(() => (modal.style.display = "none"), 300);
+        setTimeout(function() { modal.style.display = "none"; }, 300);
       }
 
+      /* ========== PRINT 58x40mm via new window ========== */
       function printFromModal() {
-        const area = document.getElementById("printArea");
-        area.innerHTML = `
-          <div style="text-align:center; padding:15px; border:1px solid #000; display:inline-block; font-family: sans-serif;">
-            <div style="font-size: 18px; font-weight: bold;">${currentItem.name}</div>
-            <div style="font-size: 12px; margin: 5px 0;">Nusxa: ${currentItem.design} | Rang: ${currentItem.color} | O'lcham: ${currentItem.size}</div>
-            <svg id="pSvg"></svg>
-          </div>`;
-        JsBarcode("#pSvg", currentItem.barcode, {
+        var item = currentItem;
+        var qty = printQuantity;
+
+        /* Generate barcode SVG */
+        var tempDiv = document.createElement("div");
+        tempDiv.style.cssText = "position:absolute;left:-9999px";
+        document.body.appendChild(tempDiv);
+
+        var tempSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        tempDiv.appendChild(tempSvg);
+
+        JsBarcode(tempSvg, item.barcode, {
           format: "EAN13",
-          width: 2,
-          height: 60,
+          width: 1.8,
+          height: 45,
+          displayValue: true,
+          fontSize: 11,
+          margin: 0,
+          textMargin: 2
         });
-        setTimeout(() => {
-          window.print();
-        }, 200);
+
+        var barcodeSvgHTML = tempSvg.outerHTML;
+        document.body.removeChild(tempDiv);
+
+        /* Build labels */
+        var labelsHTML = "";
+        for (var i = 0; i < qty; i++) {
+          labelsHTML +=
+            '<div class="label">' +
+              '<div class="label-name">' + item.name + '<\/div>' +
+              '<div class="label-info">Nusxa: ' + item.design + ' | Rang: ' + item.color + ' | O\'lcham: ' + item.size + '<\/div>' +
+              '<div class="label-barcode">' + barcodeSvgHTML + '<\/div>' +
+            '<\/div>';
+          if (i < qty - 1) {
+            labelsHTML += '<div style="page-break-after:always"><\/div>';
+          }
+        }
+
+        /* Build full HTML document using array join (NO template literals) */
+        var parts = [];
+        parts.push('<!DOCTYPE html>');
+        parts.push('<html><head><meta charset="UTF-8">');
+        parts.push('<style>');
+        parts.push('@page { size: 58mm 40mm; margin: 0 !important; }');
+        parts.push('* { margin:0; padding:0; box-sizing:border-box; }');
+        parts.push('html,body { width:58mm; margin:0; padding:0; }');
+        parts.push('.label { width:58mm; height:40mm; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2mm 2mm 1mm 2mm; overflow:hidden; page-break-inside:avoid; }');
+        parts.push('.label-name { font-family:Arial,Helvetica,sans-serif; font-size:12pt; font-weight:bold; line-height:1.1; margin-bottom:1mm; }');
+        parts.push('.label-info { font-family:Arial,Helvetica,sans-serif; font-size:7pt; line-height:1.2; margin-bottom:1.5mm; color:#000; }');
+        parts.push('.label-barcode { display:flex; justify-content:center; align-items:center; }');
+        parts.push('.label-barcode svg { width:48mm; height:auto; max-height:22mm; }');
+        parts.push('<\/style>');
+        parts.push('<\/head><body>');
+        parts.push(labelsHTML);
+        parts.push('<\/body><\/html>');
+
+        var printHTML = parts.join('\n');
+
+        /* Open new window for printing */
+        var printWin = window.open('', '_blank', 'width=300,height=250');
+        if (!printWin) {
+          alert("Popup bloklangan! Iltimos, popup-ga ruxsat bering.");
+          return;
+        }
+        printWin.document.open();
+        printWin.document.write(printHTML);
+        printWin.document.close();
+
+        setTimeout(function() {
+          printWin.focus();
+          printWin.print();
+          setTimeout(function() {
+            printWin.close();
+          }, 2000);
+        }, 500);
       }
 
       lucide.createIcons();
